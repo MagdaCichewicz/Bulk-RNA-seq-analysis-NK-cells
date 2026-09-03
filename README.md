@@ -28,5 +28,6 @@ Workflow
 
 Tools
 
-<img width="450" height="355" alt="image" src="https://github.com/user-attachments/assets/619d2b3c-67cd-4598-9187-367f1de77224" />
+<img width="450" height="250" alt="image" src="https://github.com/user-attachments/assets/31745859-9c22-429e-951e-a2bb329a5f62" />
+
 
