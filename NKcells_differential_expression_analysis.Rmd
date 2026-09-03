@@ -1,0 +1,818 @@
+---
+title: "Bulk RNA-seq Analysis of Human NK Cells"
+author: "Magda Cichewicz"
+date: "2026-08-31"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+---
+
+# Overview
+
+This analysis compares freshly isolated human NK cells with NK cells expanded ex vivo
+using K562- or LCL-based conditions (Dataset: GSE165498/SRP303210). Statistical analyses and visualizations were performed in R (version 4.6.1) using DESeq2 and associated Bioconductor/R packages.The workflow includes DESeq2 normalization and differential expression, PCA, sample-distance analysis, gene annotation, volcano and
+MA plots, a top-30 DEG heatmap, Gene Ontology enrichment analysis, and normalized expression of selected genes.
+
+```{r setup, message=FALSE, warning=FALSE}
+library(DESeq2)
+library(ggplot2)
+library(ggrepel)
+library(pheatmap)
+library(grid)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(enrichplot)
+library(apeglm)
+library(dplyr)
+library(tidyr)
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  dpi = 120
+)
+```
+
+# Import gene-level raw count data
+
+Gene-level raw counts generated using featureCounts were imported into R for downstream differential expression analysis. featureCounts assigned paired-end reads from STAR-aligned BAM files to annotated genes using the GENCODE GRCh38 gene annotation.
+
+```{r import-counts}
+counts_raw <- read.delim(
+  "../counts/gene_counts.txt",
+  comment.char = "#",
+  check.names = FALSE
+)
+
+dim(counts_raw)
+```
+
+counts_raw included 78,941 genomic features present in GENCODE annotation (raws) and 6 annotation + 9 RNA-seq samples (15 columns)
+
+Geneid | Chr | Start | End | Strand | Length | F1 | F2 | F3 | K1 | K2 | K3 | L1 | L2 | L4
+       ←------- 6 annotation -------→ ←---------- 9 samples -----------→
+       
+# Prepare count matrix
+
+From counts_raw only 9 columns containing raw counts were extracted to generate the raw count_matrix used for DESeq2 analysis.
+
+```{r prepare-count-matrix}
+count_matrix <- counts_raw[, 7:ncol(counts_raw)]
+rownames(count_matrix) <- counts_raw$Geneid
+
+colnames(count_matrix) <- c(
+  "F1", "F2", "F3",
+  "K1", "K2", "K3",
+  "L1", "L2", "L4"
+)
+
+dim(count_matrix)
+```
+
+# Sample metadata
+
+Sample metadata were created to define the experimental condition associated
+with each RNA-seq sample. Sample names were used as row names to ensure correspondence between the
+metadata and the columns of the gene-level count matrix.
+
+```{r sample-metadata}
+sample_metadata <- data.frame(
+  sample = c(
+    "F1", "F2", "F3",
+    "K1", "K2", "K3",
+    "L1", "L2", "L4"
+  ),
+  condition = c(
+    "Fresh", "Fresh", "Fresh",
+    "K562_expanded", "K562_expanded", "K562_expanded",
+    "LCL_expanded", "LCL_expanded", "LCL_expanded"
+  )
+)
+
+rownames(sample_metadata) <- sample_metadata$sample
+sample_metadata
+all(colnames(count_matrix) == rownames(sample_metadata))
+```
+
+The sample order in the metadata was verified to match the corresponding columns of the count matrix before constructing the DESeq2 dataset.
+
+# Create DESeq2 dataset
+
+The raw gene-count matrix and sample metadata were combined into a DESeq2
+dataset for differential expression analysis.Freshly isolated NK cells were set as the reference condition so that changes in gene expression in K562-expanded and LCL-expanded cells could be evaluated relative to Fresh NK cells.The number of analyzed genes was filtered so only genes with sufficient counts would be included in downstream analysis. 
+
+
+```{r create-deseq-dataset}
+sample_metadata$condition <- factor(sample_metadata$condition)
+sample_metadata$condition <- relevel(
+  sample_metadata$condition,
+  ref = "Fresh"
+)
+
+dds <- DESeqDataSetFromMatrix(
+  countData = count_matrix,
+  colData = sample_metadata,
+  design = ~ condition
+)
+
+keep <- rowSums(counts(dds)) >= 10
+dds <- dds[keep, ]
+
+dim(dds)
+```
+
+# Run DESeq2
+
+DESeq2 was used to normalize raw gene counts and perform differential expression analysis. The `DESeq()` function estimated sample-specific size factors to account for differences in sequencing depth, estimates gene-wise
+dispersion, and fits a negative binomial model for each gene.
+
+The fitted model was used to evaluate gene-expression differences among Fresh, K562-expanded, and LCL-expanded NK cells.
+
+```{r run-deseq2}
+dds <- DESeq(dds)
+resultsNames(dds)
+```
+
+# Exploratory analysis
+
+## Variance-stabilizing transformation
+
+VST transforms the counts so that the variance is more similar across the range of expression levels, while preserving biologically meaningful differences between samples.Initial counts' variance depends strongly on their mean: genes with very high counts tend to have much larger variance than genes with low counts.VST transformation made data more suitable for visualization and exploratory analysis. 
+
+
+```{r vst}
+vsd <- vst(dds, blind = FALSE)
+```
+
+## PCA
+Principal component analysis (PCA) was performed to assess overall similarity between samples and determine
+whether biological replicates cluster according to experimental condition.
+
+```{r pca, fig.width=7, fig.height=6}
+pca_data <- plotPCA(
+  vsd,
+  intgroup = "condition",
+  returnData = TRUE
+)
+
+percentVar <- round(100 * attr(pca_data, "percentVar"))
+pca_data$sample <- rownames(pca_data)
+
+condition_colors <- c(
+  Fresh = "#009E73",
+  K562_expanded = "#D55E00",
+  LCL_expanded = "#0072B2"
+)
+
+ggplot(
+  pca_data,
+  aes(
+    x = PC1,
+    y = PC2,
+    color = condition,
+    label = sample
+  )
+) +
+  geom_point(size = 3) +
+  geom_text(vjust = -0.8, show.legend = FALSE) +
+  scale_color_manual(values = condition_colors) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  labs(title = "Principal component analysis", color = "Condition") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+```
+
+
+PCA revealed strong separation between freshly isolated and ex vivo expanded
+NK cells. PC1 explained 91% of the variance and separated Fresh samples from
+both expanded conditions. In contrast, K562-expanded and LCL-expanded samples
+clustered relatively closely, suggesting that the transcriptional differences
+associated with ex vivo expansion were substantially larger than the
+differences between the two expansion conditions.
+
+## Sample-to-sample distance heatmap
+
+Pairwise Euclidean distances were calculated from variance-stabilized
+expression values to assess similarity among samples.
+
+```{r sample-distance, fig.width=8, fig.height=7}
+sample_dist <- dist(t(assay(vsd)))
+sample_dist_matrix <- as.matrix(sample_dist)
+
+annotation_col <- data.frame(
+  Condition = sample_metadata[
+    colnames(sample_dist_matrix),
+    "condition"
+  ]
+)
+
+rownames(annotation_col) <- colnames(sample_dist_matrix)
+
+annotation_colors <- list(
+  Condition = condition_colors
+)
+
+pheatmap(
+  sample_dist_matrix,
+  annotation_col = annotation_col,
+  clustering_distance_rows = sample_dist,
+  clustering_distance_cols = sample_dist,
+  color = colorRampPalette(c("white", "lightblue", "navy"))(100),
+  annotation_colors = annotation_colors,
+  border_color = NA,
+  main = "Sample-to-sample distances"
+)
+```
+Fresh NK-cell samples formed a distinct cluster from expanded samples.
+K562-expanded and LCL-expanded samples were more similar to one another,
+consistent with the pattern observed by PCA.
+
+# Differential expression analysis
+
+Differential expression was assessed using DESeq2 with Fresh NK cells as the
+reference condition. Statistical significance was defined as an adjusted
+p-value < 0.05.
+
+```{r differential-expression}
+res_K562_vs_Fresh <- results(
+  dds,
+  contrast = c("condition", "K562_expanded", "Fresh"),
+  alpha = 0.05
+)
+
+res_LCL_vs_Fresh <- results(
+  dds,
+  contrast = c("condition", "LCL_expanded", "Fresh"),
+  alpha = 0.05
+)
+
+res_K562_vs_LCL <- results(
+  dds,
+  contrast = c("condition", "K562_expanded", "LCL_expanded"),
+  alpha = 0.05
+)
+```
+
+
+
+## DEG summary
+
+```{r deg-summary}
+count_degs <- function(res) {
+  up <- sum(
+    res$padj < 0.05 & res$log2FoldChange > 0,
+    na.rm = TRUE
+  )
+  down <- sum(
+    res$padj < 0.05 & res$log2FoldChange < 0,
+    na.rm = TRUE
+  )
+  c(Upregulated = up, Downregulated = down, Total_DEG = up + down)
+}
+
+de_summary <- rbind(
+  "K562-expanded vs Fresh" = count_degs(res_K562_vs_Fresh),
+  "LCL-expanded vs Fresh" = count_degs(res_LCL_vs_Fresh),
+  "K562-expanded vs LCL-expanded" = count_degs(res_K562_vs_LCL)
+)
+
+de_summary <- data.frame(
+  Comparison = rownames(de_summary),
+  de_summary,
+  row.names = NULL
+)
+
+knitr::kable(
+  de_summary,
+  caption = "Differentially expressed genes (adjusted p-value < 0.05)"
+)
+```
+Both expansion conditions showed extensive transcriptional differences
+relative to Fresh NK cells. In contrast, substantially fewer genes differed
+between K562-expanded and LCL-expanded cells, indicating that the major
+transcriptional distinction in this dataset was between Fresh and expanded
+cells rather than between the two expansion methods.
+
+
+# MA plots and LFC shrinkage
+
+MA plots were used to visualize differential expression as a function of mean
+gene expression. Each point represents a gene, with mean normalized expression
+shown on the x-axis and log2 fold change (LFC) between conditions on the y-axis.
+This visualization helps assess the magnitude and direction of expression
+changes across genes with different expression levels.
+
+Log2 fold-change shrinkage was applied using `apeglm` to reduce unstable or
+exaggerated LFC estimates, particularly for genes with low counts or high
+variability. Shrunken LFC values provide more stable estimates of effect size
+and are useful for visualization, ranking, and biological interpretation.
+Statistical significance was determined using DESeq2-adjusted p-values.
+
+```{r ma-unshrunken, fig.width=7, fig.height=6}
+plotMA(
+  res_K562_vs_Fresh,
+  alpha = 0.05,
+  ylim = c(-10, 10),
+  main = "K562-expanded vs Fresh"
+)
+
+plotMA(
+  res_LCL_vs_Fresh,
+  alpha = 0.05,
+  ylim = c(-10, 10),
+  main = "LCL-expanded vs Fresh"
+)
+```
+
+Shrinkage reduces unstable log2 fold-change estimates, especially among genes with
+low counts.
+
+```{r lfc-shrinkage}
+res_K562_shrunk <- lfcShrink(
+  dds,
+  coef = "condition_K562_expanded_vs_Fresh",
+  type = "apeglm"
+)
+
+res_LCL_shrunk <- lfcShrink(
+  dds,
+  coef = "condition_LCL_expanded_vs_Fresh",
+  type = "apeglm"
+)
+```
+
+```{r ma-shrunken, fig.width=7, fig.height=6}
+plotMA(
+  res_K562_shrunk,
+  alpha = 0.05,
+  ylim = c(-5, 5),
+  main = "K562-expanded vs Fresh — shrunken LFC"
+)
+
+plotMA(
+  res_LCL_shrunk,
+  alpha = 0.05,
+  ylim = c(-5, 5),
+  main = "LCL-expanded vs Fresh — shrunken LFC"
+)
+```
+
+After LFC shrinkage, extreme fold-change estimates were reduced, particularly for genes with lower mean expression, resulting in more stable estimates of effect size. Despite shrinkage, a large number of genes remained significantly up- or downregulated, supporting substantial transcriptional differences between K562-expanded and Fresh NK cells, and between LCL-exapnded and Fresh NK cells. The persistence of large fold changes among many moderately and highly expressed genes indicates that these differences are well supported by the count data rather than being driven solely by unstable estimates from low-count genes.
+
+# Gene annotation
+
+The output from DESeq2 identifies genes primarily by Ensembl gene IDs. Gene annotation connects these identifiers to human-readable information such as gene symbols, important for  later parts of the analysis. 
+
+```{r gene-annotation}
+gene_ids <- rownames(dds)
+ensembl_ids <- sub("\\..*$", "", gene_ids)
+
+gene_symbols <- mapIds(
+  org.Hs.eg.db,
+  keys = ensembl_ids,
+  column = "SYMBOL",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
+
+gene_annotation <- data.frame(
+  Geneid = gene_ids,
+  Ensembl = ensembl_ids,
+  Symbol = gene_symbols,
+  row.names = gene_ids
+)
+
+head(gene_annotation)
+```
+
+
+# Volcano plots
+
+Volcano plots were used to visualize differential expression by combining statistical significance with the magnitude of gene-expression change. Each point represents a gene, with log2 fold change on the x-axis and −log10 adjusted p-value on the y-axis. Genes with both large absolute log2 fold changes and low adjusted p-values represent the strongest candidates for biologically meaningful differential expression.
+
+Differentially expressed genes (DEGs) are highlighted using adjusted p-value < 0.05 and |log2FC| > 1.
+
+```{r volcano-function}
+make_volcano <- function(res, title, n_labels = 10) {
+
+  df <- as.data.frame(res)
+  df$Geneid <- rownames(df)
+  df$Symbol <- gene_annotation[df$Geneid, "Symbol"]
+
+  df <- df[
+    !is.na(df$padj) &
+      !is.na(df$log2FoldChange),
+  ]
+
+  df$significance <- "Not significant"
+
+  df$significance[
+    df$padj < 0.05 & df$log2FoldChange > 1
+  ] <- "Upregulated"
+
+  df$significance[
+    df$padj < 0.05 & df$log2FoldChange < -1
+  ] <- "Downregulated"
+
+  df$significance <- factor(
+    df$significance,
+    levels = c("Not significant", "Downregulated", "Upregulated")
+  )
+
+  up_labels <- df[
+    df$significance == "Upregulated" & !is.na(df$Symbol),
+  ]
+  up_labels <- head(
+    up_labels[order(abs(up_labels$log2FoldChange), decreasing = TRUE), ],
+    n_labels
+  )
+
+  down_labels <- df[
+    df$significance == "Downregulated" & !is.na(df$Symbol),
+  ]
+  down_labels <- head(
+    down_labels[order(abs(down_labels$log2FoldChange), decreasing = TRUE), ],
+    n_labels
+  )
+
+  label_genes <- rbind(up_labels, down_labels)
+
+  ggplot(
+    df,
+    aes(
+      x = log2FoldChange,
+      y = -log10(padj),
+      color = significance
+    )
+  ) +
+    geom_point(alpha = 0.6, size = 1.2) +
+    geom_vline(
+      xintercept = c(-1, 1),
+      linetype = "dashed",
+      color = "gray40"
+    ) +
+    geom_hline(
+      yintercept = -log10(0.05),
+      linetype = "dashed",
+      color = "gray40"
+    ) +
+    geom_text_repel(
+      data = label_genes,
+      aes(label = Symbol),
+      size = 3,
+      max.overlaps = Inf,
+      show.legend = FALSE
+    ) +
+    scale_color_manual(
+      values = c(
+        "Not significant" = "gray70",
+        "Downregulated" = "#0072B2",
+        "Upregulated" = "#D55E00"
+      )
+    ) +
+    labs(
+      title = title,
+      x = expression(log[2] ~ fold ~ change),
+      y = expression(-log[10] ~ adjusted ~ p-value),
+      color = NULL
+    ) +
+    theme_classic() +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+}
+```
+
+```{r volcano-plots, fig.width=7, fig.height=6}
+make_volcano(res_K562_vs_Fresh, "K562-expanded vs Fresh")
+make_volcano(res_LCL_vs_Fresh, "LCL-expanded vs Fresh")
+make_volcano(res_K562_vs_LCL, "K562-expanded vs LCL-expanded")
+```
+
+Volcano plots revealed extensive differential gene expression between expanded and Fresh NK cells. Both K562-expanded vs Fresh and LCL-expanded vs Fresh comparisons showed large numbers of significantly up- and downregulated genes with substantial effect sizes. In contrast, the K562-expanded vs LCL-expanded comparison contained considerably fewer differentially expressed genes, indicating that the two expansion conditions have more similar transcriptional profiles. Together with the PCA and sample-distance analysis, these results suggest that ex vivo expansion is associated with substantially greater transcriptional differences than those observed between the two expansion methods.
+
+# Top 30 differentially expressed genes
+
+A likelihood-ratio test identifies genes with expression differences across any
+of the three conditions.
+
+```{r top30-prep}
+dds_lrt <- DESeq(
+  dds,
+  test = "LRT",
+  reduced = ~ 1
+)
+
+res_lrt <- results(dds_lrt)
+res_lrt <- res_lrt[order(res_lrt$padj), ]
+res_lrt <- res_lrt[!is.na(res_lrt$padj), ]
+
+top30_genes <- rownames(res_lrt)[1:30]
+top30_matrix <- assay(vsd)[top30_genes, ]
+
+top30_symbols <- gene_annotation[top30_genes, "Symbol"]
+
+top30_labels <- ifelse(
+  is.na(top30_symbols) | top30_symbols == "",
+  sub("\\..*$", "", top30_genes),
+  top30_symbols
+)
+
+rownames(top30_matrix) <- make.unique(top30_labels)
+top30_scaled <- t(scale(t(top30_matrix)))
+```
+
+```{r top30-heatmap, fig.width=8, fig.height=10}
+pheatmap(
+  top30_scaled,
+  annotation_col = annotation_col,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  show_rownames = TRUE,
+  show_colnames = TRUE,
+  fontsize_row = 8,
+  border_color = NA,
+  color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
+  breaks = seq(-2, 2, length.out = 101),
+  main = "Top 30 differentially expressed genes"
+)
+```
+
+The Fresh samples (F1, F2, F3) form their own cluster, clearly separated from both expanded groups.
+The K562-expanded and LCL-expanded samples cluster together,for these top DEGs, the major distinction is Fresh vs expanded NK cells, rather than K562-expanded vs LCL-expanded. 
+
+# GO enrichment analysis
+
+GO Biological Process enrichment is performed separately for up- and downregulated
+DEGs. DEGs are defined as adjusted p-value < 0.05 and |log2FC| > 1.
+
+```{r go-gene-sets}
+res_K562_df <- as.data.frame(res_K562_vs_Fresh)
+res_K562_df$Geneid <- rownames(res_K562_df)
+res_K562_df$Ensembl <- sub("\\..*$", "", res_K562_df$Geneid)
+
+res_LCL_df <- as.data.frame(res_LCL_vs_Fresh)
+res_LCL_df$Geneid <- rownames(res_LCL_df)
+res_LCL_df$Ensembl <- sub("\\..*$", "", res_LCL_df$Geneid)
+
+up_genes_K562 <- res_K562_df$Ensembl[
+  !is.na(res_K562_df$padj) &
+    res_K562_df$padj < 0.05 &
+    res_K562_df$log2FoldChange > 1
+]
+
+down_genes_K562 <- res_K562_df$Ensembl[
+  !is.na(res_K562_df$padj) &
+    res_K562_df$padj < 0.05 &
+    res_K562_df$log2FoldChange < -1
+]
+
+up_genes_LCL <- res_LCL_df$Ensembl[
+  !is.na(res_LCL_df$padj) &
+    res_LCL_df$padj < 0.05 &
+    res_LCL_df$log2FoldChange > 1
+]
+
+down_genes_LCL <- res_LCL_df$Ensembl[
+  !is.na(res_LCL_df$padj) &
+    res_LCL_df$padj < 0.05 &
+    res_LCL_df$log2FoldChange < -1
+]
+
+background_genes <- sub("\\..*$", "", rownames(dds))
+```
+
+```{r go-enrichment}
+go_up_K562 <- enrichGO(
+  gene = up_genes_K562,
+  universe = background_genes,
+  OrgDb = org.Hs.eg.db,
+  keyType = "ENSEMBL",
+  ont = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff = 0.05,
+  qvalueCutoff = 0.05,
+  readable = TRUE
+)
+
+go_down_K562 <- enrichGO(
+  gene = down_genes_K562,
+  universe = background_genes,
+  OrgDb = org.Hs.eg.db,
+  keyType = "ENSEMBL",
+  ont = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff = 0.05,
+  qvalueCutoff = 0.05,
+  readable = TRUE
+)
+
+go_up_LCL <- enrichGO(
+  gene = up_genes_LCL,
+  universe = background_genes,
+  OrgDb = org.Hs.eg.db,
+  keyType = "ENSEMBL",
+  ont = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff = 0.05,
+  qvalueCutoff = 0.05,
+  readable = TRUE
+)
+
+go_down_LCL <- enrichGO(
+  gene = down_genes_LCL,
+  universe = background_genes,
+  OrgDb = org.Hs.eg.db,
+  keyType = "ENSEMBL",
+  ont = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff = 0.05,
+  qvalueCutoff = 0.05,
+  readable = TRUE
+)
+```
+
+## K562-expanded vs Fresh
+
+```{r go-k562-plots, fig.width=8, fig.height=6}
+dotplot(go_up_K562, showCategory = 10) +
+  ggtitle("GO Biological Processes\nK562-expanded vs Fresh: upregulated genes")
+
+dotplot(go_down_K562, showCategory = 10) +
+  ggtitle("GO Biological Processes\nK562-expanded vs Fresh: downregulated genes")
+```
+
+## LCL-expanded vs Fresh
+
+```{r go-lcl-plots, fig.width=8, fig.height=6}
+dotplot(go_up_LCL, showCategory = 10) +
+  ggtitle("GO Biological Processes\nLCL-expanded vs Fresh: upregulated genes")
+
+dotplot(go_down_LCL, showCategory = 10) +
+  ggtitle("GO Biological Processes\nLCL-expanded vs Fresh: downregulated genes")
+```
+
+# Comparative GO plots
+
+```{r comparative-go-function}
+make_comparative_go <- function(go_k562, go_lcl, title) {
+
+  k562_df <- as.data.frame(go_k562)
+  lcl_df <- as.data.frame(go_lcl)
+
+  k562_df$Comparison <- "K562-expanded vs Fresh"
+  lcl_df$Comparison <- "LCL-expanded vs Fresh"
+
+  top_k562 <- k562_df[
+    order(k562_df$p.adjust),
+  ][1:min(10, nrow(k562_df)), ]
+
+  top_lcl <- lcl_df[
+    order(lcl_df$p.adjust),
+  ][1:min(10, nrow(lcl_df)), ]
+
+  plot_df <- rbind(top_k562, top_lcl)
+
+  plot_df$GeneRatio_numeric <- sapply(
+    plot_df$GeneRatio,
+    function(x) {
+      parts <- as.numeric(strsplit(x, "/")[[1]])
+      parts[1] / parts[2]
+    }
+  )
+
+  ggplot(
+    plot_df,
+    aes(
+      x = GeneRatio_numeric,
+      y = Description,
+      size = Count,
+      color = p.adjust
+    )
+  ) +
+    geom_point() +
+    facet_wrap(~ Comparison, ncol = 2) +
+    scale_x_continuous(
+      labels = scales::label_percent(accuracy = 1)
+    ) +
+    scale_color_gradient(low = "red", high = "blue") +
+    labs(
+      title = title,
+      x = "Gene ratio",
+      y = NULL,
+      color = "Adjusted p-value",
+      size = "Gene count"
+    ) +
+    theme_classic() +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      axis.text.y = element_text(size = 8),
+      strip.text = element_text(face = "bold")
+    )
+}
+```
+
+```{r comparative-go-plots, fig.width=11, fig.height=7}
+make_comparative_go(
+  go_up_K562,
+  go_up_LCL,
+  "GO Biological Processes: upregulated genes"
+)
+
+make_comparative_go(
+  go_down_K562,
+  go_down_LCL,
+  "GO Biological Processes: downregulated genes"
+)
+```
+GO enrichment analysis revealed distinct functional programs associated with ex vivo NK-cell expansion. Genes upregulated in K562-expanded relative to Fresh samples were strongly enriched for cell-cycle, DNA replication, chromosome segregation, and mitotic processes, consistent with a proliferative transcriptional state following expansion. In contrast, downregulated genes were enriched for immune-response, chemotaxis, bacterial-response, and related signaling processes. Together, these results indicate that ex vivo expansion is associated with substantial remodeling of the transcriptional programs observed in freshly isolated cells.
+
+# Normalized expression of selected genes
+
+Representative genes were selected based on the major expression patterns identified by differential expression and GO enrichment analyses to visualize sample-level normalized expression across the three conditions.
+
+```{r selected-genes-prep}
+genes_of_interest <- c(
+  "CDK1",
+  "CCNA2",
+  "BUB1",
+  "CD14",
+  "S100A9",
+  "FCN1"
+)
+
+norm_counts <- counts(dds, normalized = TRUE)
+
+selected_ids <- gene_annotation$Geneid[
+  gene_annotation$Symbol %in% genes_of_interest
+]
+
+selected_counts <- norm_counts[selected_ids, ]
+
+plot_df <- as.data.frame(selected_counts)
+plot_df$Geneid <- rownames(plot_df)
+plot_df$Symbol <- gene_annotation[plot_df$Geneid, "Symbol"]
+
+plot_long <- plot_df %>%
+  pivot_longer(
+    cols = -c(Geneid, Symbol),
+    names_to = "sample",
+    values_to = "normalized_count"
+  ) %>%
+  left_join(
+    sample_metadata[, c("sample", "condition")],
+    by = "sample"
+  )
+
+stopifnot(nrow(plot_long) == length(genes_of_interest) * nrow(sample_metadata))
+```
+
+```{r selected-genes-plot, fig.width=10, fig.height=7}
+ggplot(
+  plot_long,
+  aes(
+    x = condition,
+    y = normalized_count,
+    color = condition
+  )
+) +
+  geom_boxplot(
+    outlier.shape = NA,
+    alpha = 0.15
+  ) +
+  geom_jitter(
+    width = 0.12,
+    size = 2.5
+  ) +
+  facet_wrap(
+    ~ Symbol,
+    scales = "free_y",
+    ncol = 3
+  ) +
+  scale_color_manual(values = condition_colors) +
+  labs(
+    title = "Normalized expression of selected genes",
+    x = NULL,
+    y = "DESeq2 normalized counts"
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    legend.position = "none",
+    strip.text = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+Normalized expression of selected genes illustrates two contrasting transcriptional patterns between Fresh and expanded NK cells. Cell-cycle-associated genes (BUB1, CCNA2, and CDK1) showed very low expression in Fresh cells and markedly higher expression in both K562- and LCL-expanded cells, consistent with the enrichment of cell-cycle and proliferation-related GO terms observed in the expanded conditions. In contrast, CD14, FCN1, and S100A9 showed high expression in Fresh cells and substantially reduced expression following either expansion method. Overall, the similar expression patterns observed in K562- and LCL-expanded samples further support the finding that the major transcriptional differences are associated with ex vivo expansion rather than the specific expansion method.
+
+# Session information
+
+```{r session-info}
+sessionInfo()
+```
