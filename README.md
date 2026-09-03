@@ -31,3 +31,8 @@ Tools
 <img width="450" height="250" alt="image" src="https://github.com/user-attachments/assets/31745859-9c22-429e-951e-a2bb329a5f62" />
 
 
+Uploaded documents: 
+
+bulk RNA-seq multiqc_report.html  - 
+
+Raw FASTQ files were assessed using FastQC and results were aggregated using MultiQC. Across the nine samples, sequencing depth ranged from approximately 23.5 to 32.5 million paired-end reads per sample. Reads were 150 bp in length and showed consistently high per-base sequence quality with low adapter contamination. All nine samples were retained for downstream analysis.
