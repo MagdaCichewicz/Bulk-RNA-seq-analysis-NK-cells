@@ -40,32 +40,40 @@ The bulk RNA-seq workflow consisted of the following steps:
 2. **Raw read quality control**
    - Assessed FASTQ quality using **FastQC**.
    - Aggregated QC reports using **MultiQC**.
+  
+3. **Reference preparation and read alignment**
+   - Downloaded the **GENCODE GRCh38 primary assembly** and corresponding **GENCODE release 50 gene annotation**.
+   - Generated a **STAR genome index** using the GRCh38 reference genome and GTF annotation.
 
-3. **Read alignment**
+4. **Read alignment**
    - Aligned reads to the human **GRCh38 reference genome** using **STAR**.
    - Processed and inspected BAM files using **samtools**.
+  
+5. **Library strandedness assessment**
+   - Assessed library orientation using **RSeQC `infer_experiment.py`**.
+   - The results supported treating the RNA-seq libraries as **unstranded** for gene-level quantification.
 
-4. **Gene-level quantification**
+6. **Gene-level quantification**
    - Assigned aligned paired-end fragments to annotated genes using
      **featureCounts (Subread)** and the GENCODE GRCh38 annotation.
 
-5. **Differential expression analysis in R**
+7. **Differential expression analysis in R**
    - Imported raw gene counts into **DESeq2**.
    - Filtered low-count genes and normalized sequencing-depth differences.
    - Compared Fresh, K562-expanded, and LCL-expanded NK cells.
 
-6. **Exploratory transcriptomic analysis**
+8. **Exploratory transcriptomic analysis**
    - Variance-stabilizing transformation (VST)
    - Principal component analysis (PCA)
    - Sample-to-sample distance analysis
 
-7. **Differential expression visualization**
+9. **Differential expression visualization**
    - DEG summaries
    - MA plots and log2 fold-change shrinkage
    - Volcano plots
    - Heatmap of top differentially expressed genes
 
-8. **Functional interpretation**
+10. **Functional interpretation**
    - Ensembl-to-gene-symbol annotation
    - Gene Ontology (GO) enrichment analysis
    - Comparison of enriched biological processes between expansion conditions
