@@ -9,6 +9,7 @@ scripts/
 - 05_prepare_reference.sh
 - 06_star_alignment.sh
 - 07_process_bam.sh
-- 08_check_strandedness.sh
-- 09_featurecounts.sh
+- 08_check_strandedness.sh (RSeQC infer_experiment.py on a representative aligned BAM file)
+-   - gtf_to_bed12.py 
+- 09_featurecounts.sh 
 - NKcells_differential_expression_analysis.Rmd
