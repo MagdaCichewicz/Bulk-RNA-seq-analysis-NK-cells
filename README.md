@@ -99,7 +99,11 @@ TOOLS
 | samtools                | 1.24    |
 | Subread / featureCounts | 2.1.1   |
 | R                       | 4.6.1   |
+| DESeq2                  | 1.52.0  |
+| ggplot2                 | 4.0.3   |
+| pheatmap                | 1.0.13  |
 
+NOTE: Full list of used packages is included in sessionInfo(), reports/NKcells_differential_expression_analysis.html.
 
 ## Reports
 
