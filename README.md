@@ -85,6 +85,20 @@ Tools
 <img width="450" height="250" alt="image" src="https://github.com/user-attachments/assets/31745859-9c22-429e-951e-a2bb329a5f62" />
 
 
+## Reports
+
+### Quality control
+
+[View the interactive MultiQC report](https://magdacichewicz.github.io/Bulk-RNA-seq-workflow/reports/bulk_RNA-seq_multiqc_report.html)
+
+Raw FASTQ files were assessed using FastQC and results were aggregated using MultiQC. Across the nine samples, sequencing depth ranged from approximately 23.5 to 32.5 million paired-end reads per sample. Reads were 150 bp in length and showed consistently high per-base sequence quality with low adapter contamination. All nine samples were retained for downstream analysis.
+
+### Differential expression analysis
+
+[View the complete DESeq2 analysis report](https://magdacichewicz.github.io/Bulk-RNA-seq-workflow/reports/NKcells_differential_expression_analysis.html)
+
+R Markdown report summarizing read quantification, DESeq2-based differential expression, exploratory transcriptomic analysis, differential expression visualization, and functional enrichment.
+
 Uploaded documents: 
 
 https://magdacichewicz.github.io/Bulk-RNA-seq-workflow/reports/bulk_RNA-seq_multiqc_report.html
