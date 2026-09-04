@@ -1,6 +1,6 @@
 # Bulk-RNA-seq-workflow
 
-Description
+DESCRIPTION
 
 This repository presents an independent reanalysis of publicly available bulk RNA-seq data from human natural killer (NK) cells generated in the study “RNA-Seq Analysis Reveals CCR5 as a Key Target for CRISPR Gene Editing to Regulate In Vivo NK Cell Trafficking” (Levy et al., 2021; PMID: 33669611). The objective was to characterize the transcriptional changes associated with ex vivo NK-cell expansion and to compare the molecular profiles of K562- and LCL-expanded NK cells with those of freshly isolated NK cells.
 
@@ -17,18 +17,29 @@ The analysis compares three NK-cell conditions:
 
 Three biological samples were analyzed per condition.
 
-<img width="570" height="354" alt="image" src="https://github.com/user-attachments/assets/c5934f36-e9d5-476d-a195-0e76f318989b" />
+| Sample | SRR | Condition |
+|--------|-----|-----------|
+| F1 | SRR13523878 | Fresh NK |
+| F2 | SRR13523879 | Fresh NK |
+| F3 | SRR13523880 | Fresh NK |
+| L1 | SRR13523884 | LCL-expanded NK |
+| L2 | SRR13523885 | LCL-expanded NK |
+| L4 | SRR13523886 | LCL-expanded NK |
+| K1 | SRR13523889 | K562-expanded NK |
+| K2 | SRR13523890 | K562-expanded NK |
+| K3 | SRR13523891 | K562-expanded NK |
 
-Workflow
 
-<img width="224" height="319" alt="image" src="https://github.com/user-attachments/assets/17af5936-8256-4cc3-9be6-149a0f6432ba" />
+WORKFLOW
 
-<img width="213" height="318" alt="image" src="https://github.com/user-attachments/assets/9c721556-b293-4ef5-89a5-f7947a66f3d7" />
+### Bulk RNA-seq Workflow - Ubuntu Linux
 
+`FASTQ` → **FastQC** → **MultiQC** → **STAR** → `BAM` → **featureCounts** → `counts.csv`
 
+### Differential Expression Analysis in R
 
+`counts.csv` → **DESeq2** → **PCA** → **Differential Expression Analysis** → **Heatmap / Volcano Plot** → **Pathway Analysis**
 
-Analysis workflow
 
 The bulk RNA-seq workflow consisted of the following steps:
 
@@ -78,7 +89,7 @@ The bulk RNA-seq workflow consisted of the following steps:
    - Visualization of normalized expression for representative genes
 
 
-Tools
+TOOLS
 
 <img width="450" height="250" alt="image" src="https://github.com/user-attachments/assets/31745859-9c22-429e-951e-a2bb329a5f62" />
 
