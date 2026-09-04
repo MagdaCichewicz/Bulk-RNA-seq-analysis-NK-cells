@@ -91,17 +91,20 @@ The bulk RNA-seq workflow consisted of the following steps:
 
 TOOLS
 
-| Software                | Version |
-| ----------------------- | ------- |
-| SRA Toolkit             | 3.4.1   |
-| FastQC                  | 0.12.1  |
-| STAR                    | 2.7.10b |
-| samtools                | 1.24    |
-| Subread / featureCounts | 2.1.1   |
-| R                       | 4.6.1   |
-| DESeq2                  | 1.52.0  |
-| ggplot2                 | 4.0.3   |
-| pheatmap                | 1.0.13  |
+| Software / Package | Version |
+|--------------------|---------|
+| SRA Toolkit | 3.4.1 |
+| FastQC | 0.12.1 |
+| STAR | 2.7.10b |
+| samtools | 1.24 |
+| Subread / featureCounts | 2.1.1 |
+| R | 4.6.1 |
+| DESeq2 | 1.52.0 |
+| ggplot2 | 4.0.3 |
+| pheatmap | 1.0.13 |
+| clusterProfiler | 4.20.0 |
+| org.Hs.eg.db | 3.23.1 |
+| enrichplot | 1.32.0 |
 
 NOTE: Full list of used packages is included in sessionInfo(), reports/NKcells_differential_expression_analysis.html.
 
