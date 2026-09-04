@@ -2,11 +2,9 @@
 
 Description
 
-This repository contains a demonstration of a basic bulk RNA-seq pipeline using publicly available RNA-seq data from human natural killer (NK) cells, based on "RNA-Seq Analysis Reveals CCR5 as a Key Target for CRISPR Gene Editing to Regulate In Vivo NK Cell Trafficking", by ER Levy et al., 2021, PMID: 33669611. 
-The main aim of this analysis was to compare the transcriptome of ex vivo expanded NK cell populations to resting NK cells. 
+This repository presents an independent reanalysis of publicly available bulk RNA-seq data from human natural killer (NK) cells generated in the study “RNA-Seq Analysis Reveals CCR5 as a Key Target for CRISPR Gene Editing to Regulate In Vivo NK Cell Trafficking” (Levy et al., 2021; PMID: 33669611). The objective was to characterize the transcriptional changes associated with ex vivo NK-cell expansion and to compare the molecular profiles of K562- and LCL-expanded NK cells with those of freshly isolated NK cells.
 
-Overall, both K562- and LCL-expanded NK cells showed substantial transcriptional differences relative to Fresh NK cells, whereas the two expanded conditions were considerably more similar to each other. Expansion was associated with increased expression of cell-cycle/proliferation-related genes and reduced expression of several Fresh-associated genes.
-
+Both K562- and LCL-expanded NK cells exhibited pronounced transcriptional differences relative to Fresh NK cells, while the two expanded populations were substantially more similar to one another. Ex vivo expansion was associated with increased expression of genes involved in cell-cycle progression and proliferation, together with reduced expression of genes characteristic of the Fresh NK-cell state.
 
 Dataset: GSE165498 / SRP303210
 
