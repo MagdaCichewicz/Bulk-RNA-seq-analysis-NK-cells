@@ -91,7 +91,14 @@ The bulk RNA-seq workflow consisted of the following steps:
 
 TOOLS
 
-<img width="450" height="250" alt="image" src="https://github.com/user-attachments/assets/31745859-9c22-429e-951e-a2bb329a5f62" />
+| Software                | Version |
+| ----------------------- | ------- |
+| SRA Toolkit             | 3.4.1   |
+| FastQC                  | 0.12.1  |
+| STAR                    | 2.7.10b |
+| samtools                | 1.24    |
+| Subread / featureCounts | 2.1.1   |
+| R                       | 4.6.1   |
 
 
 ## Reports
