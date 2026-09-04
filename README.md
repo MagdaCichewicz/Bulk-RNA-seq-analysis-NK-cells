@@ -98,17 +98,3 @@ Raw FASTQ files were assessed using FastQC and results were aggregated using Mul
 [View the complete DESeq2 analysis report](https://magdacichewicz.github.io/Bulk-RNA-seq-workflow/reports/NKcells_differential_expression_analysis.html)
 
 R Markdown report summarizing read quantification, DESeq2-based differential expression, exploratory transcriptomic analysis, differential expression visualization, and functional enrichment.
-
-Uploaded documents: 
-
-https://magdacichewicz.github.io/Bulk-RNA-seq-workflow/reports/bulk_RNA-seq_multiqc_report.html
-<img width="1646" height="81" alt="image" src="https://github.com/user-attachments/assets/42287846-de50-4ad7-a071-ca694744153c" />
-
-
-Raw FASTQ files were assessed using FastQC and results were aggregated using MultiQC. Across the nine samples, sequencing depth ranged from approximately 23.5 to 32.5 million paired-end reads per sample. Reads were 150 bp in length and showed consistently high per-base sequence quality with low adapter contamination. All nine samples were retained for downstream analysis.
-
-https://magdacichewicz.github.io/Bulk-RNA-seq-workflow/reports/ NKcells_differential_expression_analysis.html
-<img width="1805" height="81" alt="image" src="https://github.com/user-attachments/assets/cce17e2d-9ffd-4c29-b32a-f851e020a4c2" />
-
-
-R Markdown summarizing read quantification, DESeq2-based differential expression, and exploratory data analysis.
