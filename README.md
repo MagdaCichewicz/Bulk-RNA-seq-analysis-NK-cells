@@ -118,6 +118,6 @@ Raw FASTQ files were assessed using FastQC and results were aggregated using Mul
 
 ### Differential expression analysis
 
-[View the complete DESeq2 analysis report](https://magdacichewicz.github.io/Bulk-RNA-seq-workflow/reports/NKcells_differential_expression_analysis.html)
+[View the DE and pathway analysis R Markdown report](https://magdacichewicz.github.io/Bulk-RNA-seq-workflow/reports/NKcells_differential_expression_analysis.html)
 
 R Markdown report summarizing read quantification, DESeq2-based differential expression, exploratory transcriptomic analysis, differential expression visualization, and functional enrichment.
